@@ -1,0 +1,4 @@
+
+- what to do if cash remaining is <$25 since we can have the edge numbers from natural blackjacks
+- persistence in the sense of browser refresh	
+	- also write to maybe a json file or something instead of DB just for the sake of saying it can be done
