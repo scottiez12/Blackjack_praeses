@@ -491,9 +491,14 @@ namespace Blackjack_praeses_api.Services
 
             decimal payout = result switch
             {
-                GameResult.PlayerWin when playerHasBlackjack && !dealerHasBlackjack => bet * 2.5m, // Blackjack pays 3:2
-                GameResult.PlayerWin or GameResult.DealerBust => bet * 3m, 
-                _ => 0m 
+                // Natural blackjack (2 cards = 21) pays 3:2 (bet + bet * 1.5)
+                GameResult.PlayerWin when playerHasBlackjack && !dealerHasBlackjack => bet * 2.5m,
+                // Regular win or dealer bust pays 1:1 (bet + bet)
+                GameResult.PlayerWin or GameResult.DealerBust => bet * 2m,
+                // Push returns original bet
+                GameResult.Push => bet,
+                // Loss or player bust = no payout
+                _ => 0m
             };
 
             player.Balance += payout;

@@ -10,8 +10,7 @@ namespace Blackjack_praeses_api.Mapping
     {
         public GameMappingProfile()
         {
-            // GameState -> GameStateDTO
-            CreateMap<GameState, GameStateDTO>()
+                        CreateMap<GameState, GameStateDTO>()
                 .ForMember(dest => dest.GameStateSessionId, opt => opt.MapFrom(src => src.Id))
                 .ForMember(dest => dest.Players, opt => opt.MapFrom(src =>
                     src.Players.Select((player, index) => MapPlayer(player, src.PlayerResults[index])).ToList()))
@@ -22,26 +21,26 @@ namespace Blackjack_praeses_api.Mapping
                 .ForMember(dest => dest.IsGameOver, opt => opt.MapFrom(src => IsGameOver(src)))
                 .ForMember(dest => dest.CardsRemaining, opt => opt.MapFrom(src => src.Shoe.Remaining))
                 .ForMember(dest => dest.TotalCards, opt => opt.MapFrom(src => 52 * src.DeckCount))
-                // Backward compatibility fields
+                // Backward compatibility fields (use human player instead of Player 0)
                 .ForMember(dest => dest.PlayerHand, opt => opt.MapFrom(src =>
-                    src.Players.Count > 0 ? src.Players[0].CurrentHand.Cards.Select(c => MapCard(c, IsGameOver(src), false)).ToList() : new List<CardDTO>()))
+                    GetHumanPlayerHand(src)))
                 .ForMember(dest => dest.PlayerValue, opt => opt.MapFrom(src =>
-                    src.Players.Count > 0 ? src.Players[0].CurrentHand.BestValue() : 0))
+                    GetHumanPlayerValue(src)))
                 .ForMember(dest => dest.Winner, opt => opt.MapFrom(src =>
                     GetOverallWinner(src)))
                 .ForMember(dest => dest.CanSplit, opt => opt.MapFrom(src =>
-                    CanSplit(src, src.Players.Count > 0 ? src.Players[0] : null)))
+                    CanSplit(src, src.Players.FirstOrDefault(p => p.IsHuman))))
                 .ForMember(dest => dest.CanDouble, opt => opt.MapFrom(src =>
-                    CanDouble(src, src.Players.Count > 0 ? src.Players[0] : null)))
+                    CanDouble(src, src.Players.FirstOrDefault(p => p.IsHuman))))
                 .ForMember(dest => dest.CurrentHandIndex, opt => opt.MapFrom(src =>
-                    src.Players.Count > 0 ? src.Players[0].CurrentHandIndex : 0))
+                    GetHumanPlayerCurrentHandIndex(src)))
                 .ForMember(dest => dest.TotalHands, opt => opt.MapFrom(src =>
-                    src.Players.Count > 0 ? src.Players[0].Hands.Count : 0));
+                    GetHumanPlayerTotalHands(src)));
         }
 
-        private static bool IsGameOver(GameState src)
+        private static bool IsGameOver(GameState gameState)
         {
-            return src.CurrentPlayerIndex >= src.Players.Count && !src.IsDealerTurn;
+            return gameState.CurrentPlayerIndex >= gameState.Players.Count && !gameState.IsDealerTurn;
         }
 
         private static PlayerDTO MapPlayer(Player player, List<GameResult> results)
@@ -98,30 +97,44 @@ namespace Blackjack_praeses_api.Mapping
             };
         }
 
-        private static bool CanSplit(GameState state, Player? player)
+        private static bool CanSplit(GameState gameState, Player? player)
         {
             if (player == null) return false;
-            if (state.CurrentPlayerIndex >= state.Players.Count) return false;
-            if (state.CurrentPlayer.PlayerId != player.PlayerId) return false;
+            if (gameState.CurrentPlayerIndex >= gameState.Players.Count) return false;
+            if (gameState.CurrentPlayer.PlayerId != player.PlayerId) return false;
             if (player.CurrentHandIndex >= player.Hands.Count) return false;
             var hand = player.CurrentHand;
-            return hand.Cards.Count == 2 && hand.Cards[0].Rank == hand.Cards[1].Rank;
+
+            // Check if hand can be split (2 cards with matching ranks)
+            if (hand.Cards.Count != 2 || hand.Cards[0].Rank != hand.Cards[1].Rank)
+                return false;
+
+            // Check if player has enough balance to split (needs to match current bet)
+            decimal splitBet = player.HandBets[player.CurrentHandIndex];
+            return player.Balance >= splitBet;
         }
 
-        private static bool CanDouble(GameState state, Player? player)
+        private static bool CanDouble(GameState gameState, Player? player)
         {
             if (player == null) return false;
-            if (state.CurrentPlayerIndex >= state.Players.Count) return false;
-            if (state.CurrentPlayer.PlayerId != player.PlayerId) return false;
+            if (gameState.CurrentPlayerIndex >= gameState.Players.Count) return false;
+            if (gameState.CurrentPlayer.PlayerId != player.PlayerId) return false;
             if (player.CurrentHandIndex >= player.Hands.Count) return false;
             var hand = player.CurrentHand;
-            return hand.Cards.Count == 2;
+
+            // Check if hand can be doubled (2 cards only)
+            if (hand.Cards.Count != 2)
+                return false;
+
+            // Check if player has enough balance to double (needs to match current bet)
+            decimal additionalBet = player.HandBets[player.CurrentHandIndex];
+            return player.Balance >= additionalBet;
         }
 
-        private static string? GetOverallWinner(GameState state)
+        private static string? GetOverallWinner(GameState gameState)
         {
-            if (state.PlayerResults.Count == 0) return null;
-            var firstPlayerResults = state.PlayerResults[0];
+            if (gameState.PlayerResults.Count == 0) return null;
+            var firstPlayerResults = gameState.PlayerResults[0];
 
             // If any hand is still in progress, game is in progress
             if (firstPlayerResults.Any(r => r == GameResult.InProgress))
@@ -141,6 +154,31 @@ namespace Blackjack_praeses_api.Mapping
 
             // Mixed results
             return null;
+        }
+
+        private static List<CardDTO> GetHumanPlayerHand(GameState gameState)
+        {
+            var humanPlayer = gameState.Players.FirstOrDefault(p => p.IsHuman);
+            if (humanPlayer == null) return new List<CardDTO>();
+            return humanPlayer.CurrentHand.Cards.Select(c => MapCard(c, IsGameOver(gameState), false)).ToList();
+        }
+
+        private static int GetHumanPlayerValue(GameState gameState)
+        {
+            var humanPlayer = gameState.Players.FirstOrDefault(p => p.IsHuman);
+            return humanPlayer?.CurrentHand.BestValue() ?? 0;
+        }
+
+        private static int GetHumanPlayerCurrentHandIndex(GameState gameState)
+        {
+            var humanPlayer = gameState.Players.FirstOrDefault(p => p.IsHuman);
+            return humanPlayer?.CurrentHandIndex ?? 0;
+        }
+
+        private static int GetHumanPlayerTotalHands(GameState gameState)
+        {
+            var humanPlayer = gameState.Players.FirstOrDefault(p => p.IsHuman);
+            return humanPlayer?.Hands.Count ?? 0;
         }
     }
 }

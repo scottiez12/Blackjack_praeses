@@ -1,6 +1,7 @@
 import { useState } from "react";
 import axios from "axios";
 import CardRow from "./components/CardRow";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 
 import type {
   GameStateDto,
@@ -19,6 +20,7 @@ export default function App() {
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const [currentBet, setCurrentBet] = useState<number>(25);
   const [bettingPhase, setBettingPhase] = useState<boolean>(false);
+  const [showNewGameConfirm, setShowNewGameConfirm] = useState<boolean>(false);
 
   async function startGame() {
     const payload: GameInitDto = {
@@ -57,7 +59,7 @@ export default function App() {
         winner: null,
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Then add delay
       for (let i = initialDealerCards; i < finalDealerCards; i++) {
@@ -66,7 +68,7 @@ export default function App() {
           dealerHand: res.data.dealerHand.slice(0, i + 1),
           winner: null,
         });
-        await new Promise((resolve) => setTimeout(resolve, 800));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 
@@ -94,7 +96,7 @@ export default function App() {
           winner: null,
         });
 
-        await new Promise((resolve) => setTimeout(resolve, 800));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
         for (let i = initialDealerCards; i < finalDealerCards; i++) {
           setGameState({
@@ -102,7 +104,7 @@ export default function App() {
             dealerHand: res.data.dealerHand.slice(0, i + 1),
             winner: null,
           });
-          await new Promise((resolve) => setTimeout(resolve, 800));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
 
@@ -181,7 +183,14 @@ export default function App() {
     }
   }
 
-  const gameOver = gameState?.winner ?? null;
+  function handleNewGame() {
+    setSessionId(null);
+    setGameState(null);
+    setBettingPhase(false);
+    setShowNewGameConfirm(false);
+  }
+
+  const gameOver = gameState?.isGameOver ?? false;
 
   return (
     <div className="min-h-screen w-screen bg-slate-950 text-white overflow-y-auto">
@@ -221,7 +230,7 @@ export default function App() {
 
             <button
               onClick={startGame}
-              className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-xl text-lg font-semibold shadow-lg"
+              className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl text-lg font-semibold shadow-lg"
             >
               Start Game
             </button>
@@ -231,7 +240,60 @@ export default function App() {
         {sessionId && gameState && (
           <div className="w-full max-w-7xl flex flex-col items-center space-y-6">
             {/* Dealer */}
-            <div className="w-full flex flex-col items-center space-y-3 p-4 bg-slate-900/50 rounded-lg">
+            <div className="w-full flex flex-col items-center space-y-3 p-4 bg-slate-900/50 rounded-lg relative">
+              {/* Shoe Status - Top Right Corner */}
+              {gameState.cardsRemaining !== undefined &&
+                gameState.totalCards && (
+                  <div className="absolute top-2 right-2 bg-slate-800/80 rounded-lg p-2 border border-slate-700 shadow-lg">
+                    <div className="flex flex-col gap-1 min-w-[180px]">
+                      <div className="text-xs text-gray-400 font-semibold">
+                        Shoe: {gameState.deckCount}{" "}
+                        {gameState.deckCount === 1 ? "Deck" : "Decks"}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-slate-700 rounded-full h-2 overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-300 ${
+                              gameState.cardsRemaining / gameState.totalCards >
+                              0.5
+                                ? "bg-green-500"
+                                : gameState.cardsRemaining /
+                                    gameState.totalCards >
+                                  0.2
+                                ? "bg-yellow-500"
+                                : "bg-red-500"
+                            }`}
+                            style={{
+                              width: `${
+                                (gameState.cardsRemaining /
+                                  gameState.totalCards) *
+                                100
+                              }%`,
+                            }}
+                          ></div>
+                        </div>
+                        <span className="text-xs text-gray-400 font-mono">
+                          {Math.round(
+                            (gameState.cardsRemaining / gameState.totalCards) *
+                              100
+                          )}
+                          %
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {gameState.cardsRemaining}/{gameState.totalCards} cards
+                      </div>
+                      {/* Reshuffle warning */}
+                      {gameState.cardsRemaining / gameState.totalCards <=
+                        0.2 && (
+                        <div className="text-xs text-yellow-400 animate-pulse">
+                          ⚠️ Reshuffle soon
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
               <div className="text-xl md:text-2xl font-semibold text-center">
                 Dealer
               </div>
@@ -243,57 +305,10 @@ export default function App() {
               </div>
             </div>
 
-            {/* Shoe Status */}
-            {gameState.cardsRemaining !== undefined && gameState.totalCards && (
-              <div className="w-full bg-slate-800/50 rounded-lg p-3">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="text-sm text-gray-400">
-                    Shoe Status ({gameState.deckCount}{" "}
-                    {gameState.deckCount === 1 ? "Deck" : "Decks"})
-                  </div>
-                  <div className="w-full max-w-md">
-                    <div className="flex justify-between text-xs text-gray-400 mb-1">
-                      <span>{gameState.cardsRemaining} cards remaining</span>
-                      <span>
-                        {Math.round(
-                          (gameState.cardsRemaining / gameState.totalCards) *
-                            100
-                        )}
-                        %
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
-                      <div
-                        className={`h-full transition-all duration-300 ${
-                          gameState.cardsRemaining / gameState.totalCards > 0.5
-                            ? "bg-green-500"
-                            : gameState.cardsRemaining / gameState.totalCards >
-                              0.2
-                            ? "bg-yellow-500"
-                            : "bg-red-500"
-                        }`}
-                        style={{
-                          width: `${
-                            (gameState.cardsRemaining / gameState.totalCards) *
-                            100
-                          }%`,
-                        }}
-                      ></div>
-                    </div>
-                    {gameState.cardsRemaining / gameState.totalCards <= 0.2 && (
-                      <div className="text-xs text-yellow-400 mt-1 text-center animate-pulse">
-                        ⚠️ Shoe will reshuffle after this hand
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* All Players at Table - Show seating order */}
             <div className="w-full bg-slate-900/30 rounded-lg p-3">
               <div className="text-sm text-gray-400 mb-2 text-center">
-                Table Seating (Left to Right)
+                Table Seating
               </div>
               <div className="flex gap-3 flex-wrap justify-center">
                 {gameState.players?.map((player) => {
@@ -393,7 +408,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Human Player */}
+            {/* Human Player Section - Combined with Betting */}
             {gameState.players
               ?.filter((p) => p.isHuman)
               .map((player) => {
@@ -441,223 +456,292 @@ export default function App() {
                       )}
                     </div>
 
-                    {/* Show all hands for this player */}
-                    <div className="space-y-4 w-full">
-                      {player.hands.map((hand, handIndex) => (
-                        <div
-                          key={handIndex}
-                          className="flex flex-col items-center"
-                        >
-                          {player.hands.length > 1 && (
-                            <div className="text-sm text-gray-400 mb-2">
-                              Hand {handIndex + 1} of {player.hands.length}
-                              {handIndex === player.currentHandIndex &&
-                                playerIndex === gameState.currentPlayerIndex &&
-                                !gameState.isGameOver && (
-                                  <span className="ml-2 text-yellow-400">
-                                    ← Playing
-                                  </span>
-                                )}
-                            </div>
-                          )}
-                          <div className="flex items-center justify-center py-2">
-                            <CardRow cards={hand} />
-                          </div>
-                          <div className="text-sm md:text-base opacity-80 text-center">
-                            Value: {player.handValues[handIndex]}
-                            {player.results[handIndex] && (
-                              <span className="ml-2 font-bold">
-                                {player.results[handIndex] === "player" && (
-                                  <span className="text-green-400">🎉 Win</span>
-                                )}
-                                {player.results[handIndex] === "dealer" && (
-                                  <span className="text-red-400">💀 Loss</span>
-                                )}
-                                {player.results[handIndex] === "push" && (
-                                  <span className="text-yellow-400">
-                                    🤝 Push
-                                  </span>
-                                )}
-                              </span>
-                            )}
-                          </div>
+                    {/* Betting Phase - Integrated into player section */}
+                    {bettingPhase && (
+                      <div className="w-full flex flex-col gap-4 items-center p-4 bg-slate-700/50 rounded-lg border border-slate-600">
+                        <div className="text-lg md:text-xl font-semibold text-yellow-400">
+                          Place Your Bet
                         </div>
-                      ))}
-                    </div>
+
+                        {/* Chip Selection */}
+                        <div className="flex gap-2 md:gap-3 flex-wrap justify-center">
+                          {[25, 50, 100, 200].map((amount) => {
+                            const isSelected = currentBet === amount;
+                            // Check if player can afford this bet (including their current bet that can be changed)
+                            const totalAvailable =
+                              player.balance + player.currentBet;
+                            const isDisabled = totalAvailable < amount;
+
+                            return (
+                              <button
+                                key={amount}
+                                onClick={() => placeBet(amount)}
+                                disabled={isDisabled}
+                                className={`px-4 py-2 md:px-6 md:py-3 rounded-full font-bold shadow-lg transition-all text-sm md:text-base text-white border-2 focus:outline-none
+                                  ${
+                                    isDisabled
+                                      ? "bg-gray-700 cursor-not-allowed opacity-50 text-gray-400 border-transparent"
+                                      : isSelected
+                                      ? "bg-slate-700 border-white"
+                                      : "bg-slate-700 hover:bg-slate-600 border-transparent"
+                                  }
+                                `}
+                              >
+                                ${amount}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {player.currentBet > 0 && (
+                          <div className="flex flex-col gap-3 items-center">
+                            <div className="text-base md:text-lg text-yellow-400">
+                              Current Bet: ${player.currentBet}
+                            </div>
+                            <button
+                              onClick={dealCards}
+                              className="px-6 py-2 md:px-8 md:py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold shadow-lg text-base md:text-lg"
+                            >
+                              Deal Cards
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Show all hands for this player - Only during gameplay */}
+                    {!bettingPhase && (
+                      <div className="space-y-4 w-full">
+                        {player.hands.map((hand, handIndex) => (
+                          <div
+                            key={handIndex}
+                            className="flex flex-col items-center"
+                          >
+                            {player.hands.length > 1 && (
+                              <div className="text-sm text-gray-400 mb-2">
+                                Hand {handIndex + 1} of {player.hands.length}
+                                {handIndex === player.currentHandIndex &&
+                                  playerIndex ===
+                                    gameState.currentPlayerIndex &&
+                                  !gameState.isGameOver && (
+                                    <span className="ml-2 text-yellow-400">
+                                      ← Playing
+                                    </span>
+                                  )}
+                              </div>
+                            )}
+                            <div className="flex items-center justify-center py-2">
+                              <CardRow cards={hand} />
+                            </div>
+                            <div className="text-sm md:text-base opacity-80 text-center">
+                              Value: {player.handValues[handIndex]}
+                              {player.results[handIndex] && (
+                                <span className="ml-2 font-bold">
+                                  {player.results[handIndex] === "player" && (
+                                    <span className="text-green-400">
+                                      🎉 Win
+                                    </span>
+                                  )}
+                                  {player.results[handIndex] === "dealer" && (
+                                    <span className="text-red-400">
+                                      💀 Loss
+                                    </span>
+                                  )}
+                                  {player.results[handIndex] === "push" && (
+                                    <span className="text-yellow-400">
+                                      🤝 Push
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
 
-            {/* Betting Phase*/}
-            {bettingPhase &&
-              gameState.players &&
-              (() => {
-                const humanPlayer = gameState.players?.find(
-                  (p: PlayerDto) => p.isHuman
-                );
-                if (!humanPlayer) return null;
+            {/* CPU Player Turn Indicator - Reserve space to prevent layout jump */}
+            <div
+              className="text-base md:text-xl text-blue-400 text-center transition-opacity duration-300"
+              style={{ minHeight: "2rem" }}
+            >
+              {!gameState.isGameOver &&
+                !bettingPhase &&
+                gameState.players &&
+                gameState.players[gameState.currentPlayerIndex]?.hands[0]
+                  ?.length > 0 &&
+                !gameState.players[gameState.currentPlayerIndex]?.isHuman && (
+                  <span className="animate-pulse">
+                    {gameState.players[gameState.currentPlayerIndex]?.name} is
+                    playing...
+                  </span>
+                )}
+            </div>
 
-                return (
-                  <div className="w-full flex flex-col gap-4 items-center p-4 md:p-6 bg-slate-800 rounded-xl">
-                    <div className="text-lg md:text-xl font-semibold">
-                      Place Your Bet
-                    </div>
-                    <div className="text-base md:text-lg text-green-400">
-                      Balance: ${humanPlayer.balance}
-                    </div>
+            {/* Game Actions Container - Left: Player Actions, Right: New Hand/Game */}
+            <div
+              className="w-full transition-opacity duration-300"
+              style={{ minHeight: "5rem" }}
+            >
+              <div className="w-full flex flex-col md:flex-row gap-4 items-center md:items-stretch justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                {/* Left Side: Player Actions */}
+                <div className="flex-1 flex flex-col gap-2 items-center justify-center">
+                  {(() => {
+                    const isHumanTurn =
+                      !gameState.isGameOver &&
+                      !bettingPhase &&
+                      gameState.players &&
+                      gameState.players[gameState.currentPlayerIndex]
+                        ?.isHuman &&
+                      gameState.players[gameState.currentPlayerIndex]
+                        ?.handValues[
+                        gameState.players[gameState.currentPlayerIndex]
+                          ?.currentHandIndex
+                      ] < 21;
 
-                    {/* Chip Selection */}
-                    <div className="flex gap-2 md:gap-3 flex-wrap justify-center">
-                      {[25, 50, 100, 200].map((amount) => (
-                        <button
-                          key={amount}
-                          onClick={() => placeBet(amount)}
-                          disabled={humanPlayer.balance < amount}
-                          className={`px-4 py-2 md:px-6 md:py-3 rounded-full font-bold shadow-lg transition-all text-sm md:text-base ${
-                            currentBet === amount
-                              ? "bg-yellow-500 text-black scale-110"
-                              : "bg-slate-700 hover:bg-slate-600"
-                          } disabled:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50`}
-                        >
-                          ${amount}
-                        </button>
-                      ))}
-                    </div>
+                    const canAct = isHumanTurn && !isAnimating;
 
-                    {humanPlayer.currentBet > 0 && (
-                      <div className="flex flex-col gap-3 items-center">
-                        <div className="text-base md:text-lg text-yellow-400">
-                          Current Bet: ${humanPlayer.currentBet}
+                    return (
+                      <>
+                        <div className="text-xs text-gray-400 uppercase tracking-wide">
+                          Your Actions
                         </div>
-                        <button
-                          onClick={dealCards}
-                          className="px-6 py-2 md:px-8 md:py-3 bg-green-600 hover:bg-green-700 rounded-xl font-semibold shadow-lg text-base md:text-lg"
-                        >
-                          Deal Cards
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-            {/* Action Buttons */}
-            {!gameState.isGameOver &&
-              !bettingPhase &&
-              gameState.players &&
-              gameState.players[gameState.currentPlayerIndex]?.isHuman &&
-              gameState.players[gameState.currentPlayerIndex]?.handValues[
-                gameState.players[gameState.currentPlayerIndex]
-                  ?.currentHandIndex
-              ] < 21 && (
-                <div className="w-full flex flex-col gap-3 md:gap-4 items-center">
-                  <div className="flex gap-2 md:gap-4 justify-center flex-wrap">
-                    <button
-                      onClick={hit}
-                      disabled={isAnimating}
-                      className="px-5 py-2 md:px-6 md:py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-xl font-medium shadow-lg transition-colors text-sm md:text-base"
-                    >
-                      Hit
-                    </button>
-                    <button
-                      onClick={stand}
-                      disabled={isAnimating}
-                      className="px-5 py-2 md:px-6 md:py-3 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-black disabled:text-gray-400 rounded-xl font-medium shadow-lg transition-colors text-sm md:text-base"
-                    >
-                      {isAnimating ? "Dealer's Turn..." : "Stand"}
-                    </button>
-                  </div>
-
-                  <div className="flex gap-2 md:gap-4 justify-center flex-wrap">
-                    {gameState.canSplit && (
-                      <button
-                        onClick={split}
-                        disabled={isAnimating}
-                        className="px-5 py-2 md:px-6 md:py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-xl font-medium shadow-lg transition-colors text-sm md:text-base"
-                      >
-                        Split
-                      </button>
-                    )}
-                    {gameState.canDouble && (
-                      <button
-                        onClick={double}
-                        disabled={isAnimating}
-                        className="px-5 py-2 md:px-6 md:py-3 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-xl font-medium shadow-lg transition-colors text-sm md:text-base"
-                      >
-                        Double Down
-                      </button>
-                    )}
-                  </div>
+                        <div className="flex gap-2 flex-wrap justify-center">
+                          <button
+                            onClick={hit}
+                            disabled={!canAct}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50 text-white rounded-lg font-medium shadow-lg transition-colors text-sm"
+                            title={
+                              !canAct ? "Not your turn" : "Draw another card"
+                            }
+                          >
+                            Hit
+                          </button>
+                          <button
+                            onClick={stand}
+                            disabled={!canAct}
+                            className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50 text-white rounded-lg font-medium shadow-lg transition-colors text-sm"
+                            title={
+                              !canAct ? "Not your turn" : "Keep current hand"
+                            }
+                          >
+                            {isAnimating ? "Dealer's Turn..." : "Stand"}
+                          </button>
+                          <button
+                            onClick={double}
+                            disabled={!canAct || !gameState.canDouble}
+                            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50 text-white rounded-lg font-medium shadow-lg transition-colors text-sm"
+                            title={
+                              !canAct
+                                ? "Not your turn"
+                                : !gameState.canDouble
+                                ? "Cannot double down"
+                                : "Double bet and take one card"
+                            }
+                          >
+                            Double Down
+                          </button>
+                          <button
+                            onClick={split}
+                            disabled={!canAct || !gameState.canSplit}
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50 text-white rounded-lg font-medium shadow-lg transition-colors text-sm"
+                            title={
+                              !canAct
+                                ? "Not your turn"
+                                : !gameState.canSplit
+                                ? "Cannot split"
+                                : "Split pair into two hands"
+                            }
+                          >
+                            Split
+                          </button>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
-              )}
 
-            {/* CPU Player Turn Indicator*/}
-            {!gameState.isGameOver &&
-              !bettingPhase &&
-              gameState.players &&
-              gameState.players[gameState.currentPlayerIndex]?.hands[0]
-                ?.length > 0 &&
-              !gameState.players[gameState.currentPlayerIndex]?.isHuman && (
-                <div className="text-base md:text-xl text-blue-400 text-center animate-pulse">
-                  {gameState.players[gameState.currentPlayerIndex]?.name} is
-                  playing...
+                {/* Right Side: New Hand / New Game */}
+                <div className="flex-1 flex flex-col gap-2 items-center justify-center">
+                  {(() => {
+                    const humanPlayer = gameState.players?.find(
+                      (p: PlayerDto) => p.isHuman
+                    );
+                    const isOutOfMoney =
+                      humanPlayer && humanPlayer.balance < 25;
+
+                    // Special case: Out of Money - Show Game Over message
+                    if (gameOver && isOutOfMoney) {
+                      return (
+                        <div className="flex flex-col gap-2 items-center">
+                          <div className="text-xl font-bold text-red-400">
+                            Game Over!
+                          </div>
+                          <div className="text-sm text-gray-300">
+                            You're out of money!
+                          </div>
+                          <button
+                            onClick={handleNewGame}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold shadow-lg text-sm"
+                          >
+                            Start New Game
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    // Normal case: Always show both buttons, enable/disable conditionally
+                    const canStartNewHand = gameOver && !isOutOfMoney;
+
+                    return (
+                      <>
+                        <div className="text-xs text-gray-400 uppercase tracking-wide">
+                          Game Options
+                        </div>
+                        <div className="flex gap-2 flex-wrap justify-center">
+                          <button
+                            onClick={newHand}
+                            disabled={!canStartNewHand}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50 text-white rounded-lg font-semibold shadow-lg text-sm transition-colors"
+                            title={
+                              canStartNewHand
+                                ? "Start a new hand"
+                                : "Finish current hand first"
+                            }
+                          >
+                            New Hand
+                          </button>
+                          <button
+                            onClick={() => setShowNewGameConfirm(true)}
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold shadow-lg text-sm transition-colors"
+                            title="Start a completely new game"
+                          >
+                            New Game
+                          </button>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
-              )}
-
-            {/* New Hand / New Game */}
-            {gameOver &&
-              (() => {
-                const humanPlayer = gameState.players?.find(
-                  (p: PlayerDto) => p.isHuman
-                );
-                const isOutOfMoney = humanPlayer && humanPlayer.balance < 25;
-
-                if (isOutOfMoney) {
-                  return (
-                    <div className="w-full flex flex-col gap-4 items-center p-4 md:p-6 bg-red-900/50 rounded-xl border-2 border-red-500">
-                      <div className="text-2xl md:text-3xl font-bold text-red-400">
-                        Game Over!
-                      </div>
-                      <div className="text-lg md:text-xl">
-                        You're out of money!
-                      </div>
-                      <button
-                        onClick={() => {
-                          setSessionId(null);
-                          setGameState(null);
-                          setBettingPhase(false);
-                        }}
-                        className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-xl font-semibold shadow-lg text-lg"
-                      >
-                        Start New Game
-                      </button>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="flex gap-3 md:gap-4 flex-wrap justify-center">
-                    <button
-                      onClick={newHand}
-                      className="px-5 py-2 md:px-6 md:py-3 bg-green-600 hover:bg-green-700 rounded-xl font-semibold shadow-lg text-sm md:text-base"
-                    >
-                      New Hand
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSessionId(null);
-                        setGameState(null);
-                        setBettingPhase(false);
-                      }}
-                      className="px-5 py-2 md:px-6 md:py-3 bg-purple-600 hover:bg-purple-700 rounded-xl font-semibold shadow-lg text-sm md:text-base"
-                    >
-                      New Game
-                    </button>
-                  </div>
-                );
-              })()}
+              </div>
+            </div>
           </div>
         )}
+
+        {/* Confirmation Dialog for New Game */}
+        <ConfirmDialog
+          isOpen={showNewGameConfirm}
+          title="Start New Game?"
+          message="This will end the current game and reset all progress. Are you sure?"
+          confirmText="Yes, New Game"
+          cancelText="Cancel"
+          variant="warning"
+          onConfirm={handleNewGame}
+          onCancel={() => setShowNewGameConfirm(false)}
+        />
       </div>
     </div>
   );
