@@ -15,7 +15,7 @@ namespace Blackjack_praeses_api.Services
                 Shoe = shoe,
                 DeckCount = decks,
                 DealerHitsSoft17 = dealerHitsSoft17,
-                CurrentPlayerIndex = 0
+                CurrentPlayerIndex = playerCount - 1  // Start from rightmost player (highest index)
             };
 
             // Randomize human player position
@@ -149,9 +149,10 @@ namespace Blackjack_praeses_api.Services
                 return;
             }
 
-            gameState.CurrentPlayerIndex++;
+            // Move to next player (right-to-left, so decrement)
+            gameState.CurrentPlayerIndex--;
 
-            if (gameState.CurrentPlayerIndex < gameState.Players.Count)
+            if (gameState.CurrentPlayerIndex >= 0)
             {
                 if (!gameState.Players[gameState.CurrentPlayerIndex].IsHuman)
                 {
@@ -168,12 +169,12 @@ namespace Blackjack_praeses_api.Services
 
         private void ProcessCpuTurn(GameState gameState)
         {
-            if (!gameState.IsPlayerTurn || gameState.CurrentPlayerIndex >= gameState.Players.Count)
+            if (!gameState.IsPlayerTurn || gameState.CurrentPlayerIndex < 0 || gameState.CurrentPlayerIndex >= gameState.Players.Count)
                 return;
 
             var player = gameState.CurrentPlayer;
             if (player.IsHuman)
-                return; 
+                return;
 
             var hand = player.CurrentHand;
 
@@ -192,7 +193,7 @@ namespace Blackjack_praeses_api.Services
                 case CpuPlayerStrategy.Action.Hit:
                     PlayerHit(gameState);
                     // If not bust and still CPU's turn, continue
-                    if (gameState.IsPlayerTurn && gameState.CurrentPlayerIndex < gameState.Players.Count && !gameState.CurrentPlayer.IsHuman)
+                    if (gameState.IsPlayerTurn && gameState.CurrentPlayerIndex >= 0 && gameState.CurrentPlayerIndex < gameState.Players.Count && !gameState.CurrentPlayer.IsHuman)
                     {
                         ProcessCpuTurn(gameState);
                     }
@@ -209,7 +210,7 @@ namespace Blackjack_praeses_api.Services
                 case CpuPlayerStrategy.Action.Split:
                     PlayerSplit(gameState);
                     // After split, if still CPU's turn, continue with first split hand
-                    if (gameState.IsPlayerTurn && gameState.CurrentPlayerIndex < gameState.Players.Count && !gameState.CurrentPlayer.IsHuman)
+                    if (gameState.IsPlayerTurn && gameState.CurrentPlayerIndex >= 0 && gameState.CurrentPlayerIndex < gameState.Players.Count && !gameState.CurrentPlayer.IsHuman)
                     {
                         ProcessCpuTurn(gameState);
                     }
@@ -389,7 +390,7 @@ namespace Blackjack_praeses_api.Services
                 Shoe = shoe,
                 DeckCount = gameState.DeckCount,
                 DealerHitsSoft17 = gameState.DealerHitsSoft17,
-                CurrentPlayerIndex = 0
+                CurrentPlayerIndex = preservedPlayers.Count - 1  // Start from rightmost player
             };
 
             // Recreate players with preserved balances
@@ -423,11 +424,13 @@ namespace Blackjack_praeses_api.Services
         private void DealInitialCards(GameState gameState)
         {
             // Deal two rounds: first card to each player and dealer, then second card
+            // Deal right-to-left (clockwise from dealer's perspective)
             for (int round = 0; round < 2; round++)
             {
-                foreach (var player in gameState.Players)
+                // Deal to players right-to-left (highest index to 0)
+                for (int i = gameState.Players.Count - 1; i >= 0; i--)
                 {
-                    player.Hands[0].Add(gameState.Shoe.Draw());
+                    gameState.Players[i].Hands[0].Add(gameState.Shoe.Draw());
                 }
                 gameState.DealerHand.Add(gameState.Shoe.Draw());
             }
@@ -449,7 +452,7 @@ namespace Blackjack_praeses_api.Services
             // Hand over if dealer has blackjack
             if (dealerHasBlackjack)
             {
-                gameState.CurrentPlayerIndex = gameState.Players.Count;
+                gameState.CurrentPlayerIndex = -1;  // Set to -1 to indicate all players done
                 gameState.IsDealerTurn = false;
             }
         }
@@ -457,13 +460,14 @@ namespace Blackjack_praeses_api.Services
         private void AdvanceToFirstActivePlayer(GameState gameState)
         {
             // Skip players who have blackjack and advance to first player who needs to act
-            while (gameState.CurrentPlayerIndex < gameState.Players.Count)
+            // Moving right-to-left (decrementing index)
+            while (gameState.CurrentPlayerIndex >= 0)
             {
                 var currentPlayer = gameState.Players[gameState.CurrentPlayerIndex];
 
                 if (currentPlayer.Hands[0].IsBlackjack())
                 {
-                    gameState.CurrentPlayerIndex++;
+                    gameState.CurrentPlayerIndex--;
                 }
                 else
                 {
@@ -476,8 +480,8 @@ namespace Blackjack_praeses_api.Services
                 }
             }
 
-            // If all players had blackjack, move to dealer turn
-            if (gameState.CurrentPlayerIndex >= gameState.Players.Count)
+            // If all players had blackjack (CurrentPlayerIndex went below 0), move to dealer turn
+            if (gameState.CurrentPlayerIndex < 0)
             {
                 gameState.IsDealerTurn = true;
                 ResolveDealerPlay(gameState);
