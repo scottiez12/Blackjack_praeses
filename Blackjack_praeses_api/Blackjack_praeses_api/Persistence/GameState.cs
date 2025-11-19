@@ -17,8 +17,10 @@ namespace Blackjack_praeses_api.Persistence
             public bool DealerHitsSoft17 { get; set; } = false;
 
             // Helper properties
-            public Player CurrentPlayer => Players[CurrentPlayerIndex];
-            public bool IsPlayerTurn => !IsDealerTurn && CurrentPlayerIndex < Players.Count;
+            public Player CurrentPlayer => CurrentPlayerIndex >= 0 && CurrentPlayerIndex < Players.Count
+                ? Players[CurrentPlayerIndex]
+                : null!;
+            public bool IsPlayerTurn => !IsDealerTurn && CurrentPlayerIndex >= 0 && CurrentPlayerIndex < Players.Count;
 
     }
 }

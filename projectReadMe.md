@@ -59,3 +59,6 @@ Build/Launch Instructions:
 - Run "npm run dev"
 - When prompted in the terminal, open the client in the browser (chrome, localhost:5173)
 - Have fun!
+
+Exception thrown: 'AutoMapper.AutoMapperMappingException' in AutoMapper.dll
+Exception thrown: 'AutoMapper.AutoMapperMappingException' in AutoMapper.dll

@@ -308,7 +308,10 @@ export default function App() {
             {/* All Players at Table - Show seating order */}
             <div className="w-full bg-slate-900/30 rounded-lg p-3">
               <div className="text-sm text-gray-400 mb-2 text-center">
-                Table Seating
+                Table Seating{" "}
+                <span className="text-xs text-gray-500">
+                  (Plays Right → Left)
+                </span>
               </div>
               <div className="flex gap-3 flex-wrap justify-center">
                 {gameState.players?.map((player) => {
@@ -320,17 +323,40 @@ export default function App() {
                     playerIndex === gameState.currentPlayerIndex &&
                     !gameState.isGameOver;
 
+                  // Calculate turn order (right-to-left: highest index plays first)
+                  const turnOrder = gameState.players.length - playerIndex;
+
+                  // Position labels (casino terminology)
+                  const positionLabel =
+                    playerIndex === gameState.players.length - 1
+                      ? "First Base"
+                      : playerIndex === 0
+                      ? "Third Base"
+                      : playerIndex === gameState.players.length - 2
+                      ? "Second Base"
+                      : `Seat ${playerIndex + 1}`;
+
                   return (
                     <div
                       key={player.playerId}
                       className={`flex flex-col items-center p-2 rounded-lg text-xs transition-all ${
-                        isHuman && isCurrentPlayer
-                          ? "bg-slate-700 border border-yellow-400"
+                        isCurrentPlayer
+                          ? "bg-yellow-900/50 border-2 border-yellow-400 shadow-lg shadow-yellow-400/50"
                           : isHuman
                           ? "bg-green-900/30 border border-green-600"
                           : "bg-slate-800/50"
                       }`}
                     >
+                      {/* Position Label */}
+                      <div className="text-[10px] text-gray-500 mb-0.5">
+                        {positionLabel}
+                      </div>
+
+                      {/* Turn Order Badge */}
+                      <div className="text-[10px] text-gray-400 mb-1 bg-slate-700 px-1.5 py-0.5 rounded">
+                        Turn #{turnOrder}
+                      </div>
+
                       <div
                         className={`font-semibold mb-1 ${
                           isHuman ? "text-green-400" : "text-blue-400"
@@ -340,8 +366,10 @@ export default function App() {
                         {isHuman && (
                           <span className="ml-1 text-green-400">👤</span>
                         )}
-                        {isHuman && isCurrentPlayer && (
-                          <span className="ml-1 text-yellow-400">●</span>
+                        {isCurrentPlayer && (
+                          <span className="ml-1 text-yellow-400 animate-pulse">
+                            ▶
+                          </span>
                         )}
                       </div>
                       <div className="flex gap-2 mb-1">

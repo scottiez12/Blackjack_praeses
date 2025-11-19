@@ -40,7 +40,8 @@ namespace Blackjack_praeses_api.Mapping
 
         private static bool IsGameOver(GameState gameState)
         {
-            return gameState.CurrentPlayerIndex >= gameState.Players.Count && !gameState.IsDealerTurn;
+            // Game is over when all players are done (CurrentPlayerIndex < 0) and dealer is done
+            return gameState.CurrentPlayerIndex < 0 && !gameState.IsDealerTurn;
         }
 
         private static PlayerDTO MapPlayer(Player player, List<GameResult> results)
@@ -100,7 +101,10 @@ namespace Blackjack_praeses_api.Mapping
         private static bool CanSplit(GameState gameState, Player? player)
         {
             if (player == null) return false;
-            if (gameState.CurrentPlayerIndex >= gameState.Players.Count) return false;
+            // Check if it's a valid player turn (not out of bounds)
+            if (gameState.CurrentPlayerIndex < 0 || gameState.CurrentPlayerIndex >= gameState.Players.Count) return false;
+            // Check if CurrentPlayer is valid (should not be null after bounds check, but be safe)
+            if (gameState.CurrentPlayer == null) return false;
             if (gameState.CurrentPlayer.PlayerId != player.PlayerId) return false;
             if (player.CurrentHandIndex >= player.Hands.Count) return false;
             var hand = player.CurrentHand;
@@ -117,7 +121,10 @@ namespace Blackjack_praeses_api.Mapping
         private static bool CanDouble(GameState gameState, Player? player)
         {
             if (player == null) return false;
-            if (gameState.CurrentPlayerIndex >= gameState.Players.Count) return false;
+            // Check if it's a valid player turn (not out of bounds)
+            if (gameState.CurrentPlayerIndex < 0 || gameState.CurrentPlayerIndex >= gameState.Players.Count) return false;
+            // Check if CurrentPlayer is valid (should not be null after bounds check, but be safe)
+            if (gameState.CurrentPlayer == null) return false;
             if (gameState.CurrentPlayer.PlayerId != player.PlayerId) return false;
             if (player.CurrentHandIndex >= player.Hands.Count) return false;
             var hand = player.CurrentHand;
